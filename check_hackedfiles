@@ -3,7 +3,7 @@
 # Written By: Nedelin Petkov
 # Created date: Aug 11 2017
 # Last update: Sep 26 2017
-# Version: 1.3.2
+# Version: 1.3.3
 #
 
 # Config regular expression
@@ -29,6 +29,7 @@ USAGE="Usage: `basename $0` [-h] [-d DIR] [-b NUM] [-l LOG] [-s w/c] [-x FILE]\n
         -l [FILE] Log file.\n
         -s [w]arning or [c]ritical: Select state when hacked files are present. Default: w\n
         -x [FILE] Exclude. List of files to skip check.\n
+	-e [EXTENSIONS] Exclude file extensions. e.g. \"*.jpg|*.png\"\n
         Please use full paths!
 "
 
@@ -37,7 +38,7 @@ if [ "$1" == "-h" ] || [ "$1" == "" ] ; then
         exit $STATE_UNKNOWN
 fi
 
-while getopts d:b:l:s:x: option
+while getopts d:b:l:s:x:e: option
 do
         case "${option}"
                 in
@@ -46,6 +47,7 @@ do
                 l) LOG_FILE=${OPTARG};;
                 s) RETURN_STATE=${OPTARG};;
                 x) EXCLUDE_FILES=${OPTARG};;
+		e) EXCLUDE_FILE_EXTENSIONS=${OPTARG};;
         esac
 done
 
@@ -69,13 +71,25 @@ fi
 if [ -z $EXCLUDE_FILES ]; then
         EXCLUDE_PART=""
 else
-        EXCLUDE_PART=$(printf "! -samefile %s " $(cat $EXCLUDE_FILES))
+	if [ -s "$EXCLUDE_FILES" ]; then 
+		EXCLUDE_PART=$(printf "! -samefile %s " $(cat $EXCLUDE_FILES))
+	else
+		EXCLUDE_PART=""
+	fi
 fi
 ### EO Excludes
 
+### Exclude file extensions
+if [ -z $EXCLUDE_FILE_EXTENSIONS ]; then
+        EXCLUDE_EXTENSIONS_PART=""
+else
+        EXCLUDE_EXTENSIONS_PART=$(printf "! -name %s " $(echo $EXCLUDE_FILE_EXTENSIONS | sed 's/|/ /g'))
+fi
+### EO Exclude file extensions
+
 DATE=$(date)
 
-CHECK=$(find $CHECK_DIR -type f \( -name "*" $EXCLUDE_PART \) -ctime -$DAYS_BACK -exec grep -lrE "$REG_EXPR" {} \;)
+CHECK=$(find $CHECK_DIR -type f \( -name "*" $EXCLUDE_EXTENSIONS_PART $EXCLUDE_PART \) -ctime -$DAYS_BACK -exec grep -lrE "$REG_EXPR" {} \;)
 
 echo "----" >> $LOG_FILE
 echo $DATE >> $LOG_FILE
